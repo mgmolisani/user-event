@@ -154,6 +154,43 @@ test('wrapping a bare blur in `act` keeps the internal `change` inside `act`', a
   expect(actWarnings).toHaveLength(0)
 })
 
+
+test('2 wrapping a bare blur in `act` keeps the internal `change` inside `act`', async () => {
+  function Comp() {
+    const [changes, setChanges] = useState(0)
+    const ref = useRef<HTMLInputElement>(null)
+    useEffect(() => {
+      const el = ref.current as HTMLInputElement
+      const onChange = () => setChanges(c => c + 1)
+      el.addEventListener('change', onChange)
+      return () => el.removeEventListener('change', onChange)
+    }, [])
+    return (
+      <>
+        <input ref={ref} aria-label="field" />
+        <span>{changes}</span>
+        <button>go here</button>
+      </>
+    )
+  }
+
+  render(<Comp />)
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('field'), 'hello')
+
+  // The blur is not a user-event action but it results in
+  // a user-event change event being fired, so the caller wraps it in `act`.
+  await user.tab();
+
+  expect(screen.getByRole('button')).toHaveFocus()
+
+  expect(screen.getByText('1')).toBeInTheDocument()
+  const actWarnings = (console.error as jest.Mock).mock.calls.filter(c =>
+    String(c[0]).includes('not wrapped in act'),
+  )
+  expect(actWarnings).toHaveLength(0)
+})
+
 describe('typing in a formatted input', () => {
   function DollarInput({initialValue = ''}) {
     const [val, setVal] = useState(initialValue)
