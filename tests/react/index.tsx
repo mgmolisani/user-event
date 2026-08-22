@@ -155,7 +155,7 @@ test('wrapping a bare blur in `act` keeps the internal `change` inside `act`', a
 })
 
 
-test('2 wrapping a bare blur in `act` keeps the internal `change` inside `act`', async () => {
+test('user event methods already wrap the blur in an act, so the internal `change` is inside `act`', async () => {
   function Comp() {
     const [changes, setChanges] = useState(0)
     const ref = useRef<HTMLInputElement>(null)
@@ -178,8 +178,6 @@ test('2 wrapping a bare blur in `act` keeps the internal `change` inside `act`',
   const user = userEvent.setup()
   await user.type(screen.getByLabelText('field'), 'hello')
 
-  // The blur is not a user-event action but it results in
-  // a user-event change event being fired, so the caller wraps it in `act`.
   await user.tab();
 
   expect(screen.getByRole('button')).toHaveFocus()
