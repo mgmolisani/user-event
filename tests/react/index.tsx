@@ -1,5 +1,5 @@
-import React, {useLayoutEffect, useRef, useState} from 'react'
-import {render, screen, waitFor} from '@testing-library/react'
+import React, {useEffect, useLayoutEffect, useRef, useState} from 'react'
+import {act, render, screen, waitFor} from '@testing-library/react'
 import userEvent from '#src'
 import {getUISelection, getUIValue} from '#src/document'
 import {addListeners} from '#testHelpers'
@@ -116,6 +116,42 @@ test('trigger onChange SyntheticEvent on input', async () => {
 
   expect(inputHandler).toHaveBeenCalledTimes(6)
   expect(changeHandler).toHaveBeenCalledTimes(6)
+})
+
+
+test('wrapping a bare blur in `act` keeps the internal `change` inside `act`', async () => {
+  function Comp() {
+    const [changes, setChanges] = useState(0)
+    const ref = useRef<HTMLInputElement>(null)
+    useEffect(() => {
+      const el = ref.current as HTMLInputElement
+      const onChange = () => setChanges(c => c + 1)
+      el.addEventListener('change', onChange)
+      return () => el.removeEventListener('change', onChange)
+    }, [])
+    return (
+      <>
+        <input ref={ref} aria-label="field" />
+        <span>{changes}</span>
+      </>
+    )
+  }
+
+  render(<Comp />)
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('field'), 'hello')
+
+  // The blur is not a user-event action but it results in
+  // a user-event change event being fired, so the caller wraps it in `act`.
+  act(() => {
+    ;(screen.getByLabelText('field') as HTMLInputElement).blur()
+  })
+
+  expect(screen.getByText('1')).toBeInTheDocument()
+  const actWarnings = (console.error as jest.Mock).mock.calls.filter(c =>
+    String(c[0]).includes('not wrapped in act'),
+  )
+  expect(actWarnings).toHaveLength(0)
 })
 
 describe('typing in a formatted input', () => {
